@@ -11,10 +11,11 @@ class Main {
     private static final int FILE_NOT_FOUND_CODE = -1;//Error code for file not found
     private static final int ERROR_READING_FILE_CODE = -2;//Error code for error reading file
 	private static final double PIXEL_VALUE = 16.0;//16 different pixel values in the image
+	private static final double TWO_FOR_AVG = 2.0;//Divisor for calculating the average accuracy
 
-	private static final double GAMMA_VALUE = 0.5;//Gamma value for RBF kernel. It is the gamma parameter for the RBF kernel. The larger the value, the more complex the model. The smaller the value, the simpler the model.
-	private static final double COST_PARAMETER = 1.0;//Cost parameter. It is the cost of misclassification. A large C gives you low bias and high variance. A small C gives you higher bias and lower variance.
-	private static final double STOPPING_CRITERIA = 1e-3;//Stopping criteria. It is the tolerance of the termination criterion. The smaller the value, the more accurate the result and the longer it takes to converge.
+	private static final double GAMMA_VALUE = 0.3905;//Gamma value for RBF kernel. It is the gamma parameter for the RBF kernel. The larger the value, the more complex the model. The smaller the value, the simpler the model.
+	private static final double COST_PARAMETER = .8909;//Cost parameter. It is the cost of misclassification. A large C gives you low bias and high variance. A small C gives you higher bias and lower variance.
+	private static final double STOPPING_CRITERIA = 1e-2;//Stopping criteria. It is the tolerance of the termination criterion. The smaller the value, the more accurate the result and the longer it takes to converge.
 
 	public static void main(String[] args) {
 		// This is the main function
@@ -29,7 +30,8 @@ class Main {
 		System.out.println("Accuracy for model trained on dataset2 and tested on dataset1: " + accuracy2 + "%");
 		
 		// Print the average accuracy of the model
-		System.out.println("Average Accuracy: " + (accuracy1 + accuracy2)/2 + "%");
+		System.out.println("Average Accuracy: " +(accuracy1 + accuracy2)/TWO_FOR_AVG + "%");
+
 	}
 
 	static double runSVM(String trainFile, String testFile){
@@ -134,6 +136,7 @@ class Main {
 
 		// Initialize the correct counter for counting the number of correct predictions by the model to 0
 		int correct = 0;
+		int[][] confusionMatrix = new int[10][10];//Create a confusion matrix to store the number of correct and incorrect predictions for each label
 
 		// Test the SVM model on the test data
 		for(int image = 0; image < testData.length; image++) {//For each image in the test data
@@ -147,10 +150,30 @@ class Main {
 			if(label == testData[image][PIXEL_COUNT]) {//If the predicted label is equal to the actual label
 				correct++;//Increment the correct counter
 			}
+			confusionMatrix[(int)label][(int)testData[image][PIXEL_COUNT]]++;//Increment the incorrect prediction count for the label in the confusion matrix
+			
 		}
+		printConfusionMatrix(confusionMatrix);//Print the confusion matrix
 		return correct;
 	}
 
+	static void printConfusionMatrix(int[][] confusionMatrix) {
+		// This function prints the confusion matrix
+		System.out.println("Confusion Matrix:");
+		System.out.print("Label\t");
+		for(int i = 0; i < 10; i++) {
+			System.out.print(i + "\t");
+		}
+		System.out.println();
+		for(int i = 0; i < 10; i++) {
+			System.out.print(i + "\t");
+			for(int j = 0; j < 10; j++) {
+				System.out.print(confusionMatrix[i][j] + "\t");
+			}
+			System.out.println();
+		}
+	}
+	
 	static int[][] readCSV(String filename) {
         // This function reads a csv file and returns a 2D array of integers containing the data from the csv file
         // If there is an error reading the file it prints the stack trace and returns null
@@ -162,10 +185,10 @@ class Main {
             }
             int[][] myArray = new int[lineCount][ROW_LENGTH];//Create an array to store the data from the csv file. Each row has 65 columns(64 pixels + 1 label)
             Scanner readMyFile = new Scanner(myFile);//creates a new scanner instance
-            for (int i = 0; i < lineCount; i++) {
+            for (int image = 0; image < lineCount; image++) {
                 String[] line = readMyFile.nextLine().split(",");
-                for (int j = 0; j < 65; j++) {
-                    myArray[i][j] = Integer.parseInt(line[j]);
+                for (int pixel = 0; pixel < ROW_LENGTH; pixel++) {
+                    myArray[image][pixel] = Integer.parseInt(line[pixel]);
                 }
             }
             readMyFile.close();
