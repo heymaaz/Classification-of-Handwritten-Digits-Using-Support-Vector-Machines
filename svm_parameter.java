@@ -8,15 +8,15 @@ public class svm_parameter
 
 	public int svm_type;
 	public int kernel_type;
-	public double gamma;	// for poly/rbf/sigmoid
+	public double gamma;	
 
 	// these are for training only
 	public double cache_size; // in MB
 	public double eps;	// stopping criteria
-	public double C;	// for C_SVC, EPSILON_SVR and NU_SVR
-	public int nr_weight;		// for C_SVC
-	public int[] weight_label;	// for C_SVC
-	public double[] weight;		// for C_SVC
+	public double C;	
+	public int nr_weight;		
+	public int[] weight_label;	
+	public double[] weight;		
 	public int shrinking;	// use the shrinking heuristics
 	public int probability; // do probability estimates
 	
