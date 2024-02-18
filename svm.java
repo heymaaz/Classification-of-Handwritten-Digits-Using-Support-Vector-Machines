@@ -633,13 +633,22 @@ public class svm {
 	//
 	public static final Random rand = new Random();
 
-	
 
-	//private static svm_print_interface svm_print_string = svm_print_stdout;
+	private static svm_print_interface svm_print_stdout = new svm_print_interface()
+	{
+		public void print(String s)
+		{
+			System.out.print(s);
+			System.out.flush();
+		}
+	};
+
+
+	private static svm_print_interface svm_print_string = svm_print_stdout;
 
 	static void info(String s)
 	{
-		//svm_print_string.print(s);
+		svm_print_string.print(s);
 	}
 
 	private static void solve_c_svc(svm_problem prob, svm_parameter param,
