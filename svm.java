@@ -84,35 +84,6 @@ class Cache {
 		return len;
 	}
 
-	void swap_index(int i, int j)
-	{
-		if(i==j) return;
-
-		if(head[i].len > 0) lru_delete(head[i]);
-		if(head[j].len > 0) lru_delete(head[j]);
-		do {float[] tmp=head[i].data; head[i].data=head[j].data; head[j].data=tmp;} while(false);
-		do {int tmp=head[i].len; head[i].len=head[j].len; head[j].len=tmp;} while(false);
-		if(head[i].len > 0) lru_insert(head[i]);
-		if(head[j].len > 0) lru_insert(head[j]);
-
-		if(i>j) do {int tmp=i; i=j; j=tmp;} while(false);
-		for(head_t h = lru_head.next; h!=lru_head; h=h.next)
-		{
-			if(h.len > i)
-			{
-				if(h.len > j)
-					do {float tmp=h.data[i]; h.data[i]=h.data[j]; h.data[j]=tmp;} while(false);
-				else
-				{
-					// give up
-					lru_delete(h);
-					size += h.len;
-					h.data = null;
-					h.len = 0;
-				}
-			}
-		}
-	}
 }
 
 //
@@ -137,11 +108,6 @@ abstract class Kernel extends QMatrix {
 	abstract float[] get_Q(int column, int len);
 	abstract double[] get_QD();
 
-	void swap_index(int i, int j)
-	{
-		do {svm_node[] tmp=x[i]; x[i]=x[j]; x[j]=tmp;} while(false);
-		if(x_square != null) do {double tmp=x_square[i]; x_square[i]=x_square[j]; x_square[j]=tmp;} while(false);
-	}
 	double kernel_function(int i, int j)
 	{
 		return Math.exp(-gamma*(x_square[i]+x_square[j]-2*dot(x[i],x[j])));
@@ -166,15 +132,7 @@ abstract class Kernel extends QMatrix {
 		int j = 0;
 		while(i < xlen && j < ylen)
 		{
-			if(x[i].index == y[j].index)
-				sum += x[i++].value * y[j++].value;
-			else
-			{
-				if(x[i].index > y[j].index)
-					++j;
-				else
-					++i;
-			}
+			sum += x[i++].value * y[j++].value;
 		}
 		return sum;
 	}
@@ -188,34 +146,10 @@ abstract class Kernel extends QMatrix {
 		int j = 0;
 		while(i < xlen && j < ylen)
 		{
-			if(x[i].index == y[j].index)
-			{
-				double d = x[i++].value - y[j++].value;
-				sum += d*d;
-			}
-			else if(x[i].index > y[j].index)
-			{
-				sum += y[j].value * y[j].value;
-				++j;
-			}
-			else
-			{
-				sum += x[i].value * x[i].value;
-				++i;
-			}
+			double d = x[i++].value - y[j++].value;
+			sum += d*d;
 		}
 
-		while(i < xlen)
-		{
-			sum += x[i].value * x[i].value;
-			++i;
-		}
-
-		while(j < ylen)
-		{
-			sum += y[j].value * y[j].value;
-			++j;
-		}
 
 		return Math.exp(-param.gamma*sum);
 		
@@ -275,7 +209,6 @@ class Solver {
 	}
 	boolean is_upper_bound(int i) { return alpha_status[i] == UPPER_BOUND; }
 	boolean is_lower_bound(int i) { return alpha_status[i] == LOWER_BOUND; }
-	boolean is_free(int i) { return alpha_status[i] == FREE; }
 
 	// java: information about solution except alpha,
 	// because we cannot return multiple values otherwise...
@@ -287,59 +220,8 @@ class Solver {
 		double r;	// for Solver_NU
 	}
 
-	void swap_index(int i, int j)
-	{
-		Q.swap_index(i,j);
-		do {byte tmp=y[i]; y[i]=y[j]; y[j]=tmp;} while(false);
-		do {double tmp=G[i]; G[i]=G[j]; G[j]=tmp;} while(false);
-		do {byte tmp=alpha_status[i]; alpha_status[i]=alpha_status[j]; alpha_status[j]=tmp;} while(false);
-		do {double tmp=alpha[i]; alpha[i]=alpha[j]; alpha[j]=tmp;} while(false);
-		do {double tmp=p[i]; p[i]=p[j]; p[j]=tmp;} while(false);
-		do {int tmp=active_set[i]; active_set[i]=active_set[j]; active_set[j]=tmp;} while(false);
-		do {double tmp=G_bar[i]; G_bar[i]=G_bar[j]; G_bar[j]=tmp;} while(false);
-	}
 
-	void reconstruct_gradient()
-	{
-		// reconstruct inactive elements of G from G_bar and free variables
-
-		if(active_size == l) return;
-
-		int i,j;
-		int nr_free = 0;
-
-		for(j=active_size;j<l;j++)
-			G[j] = G_bar[j] + p[j];
-
-		for(j=0;j<active_size;j++)
-			if(is_free(j))
-				nr_free++;
-
-		if(2*nr_free < active_size)
-			svm.info("\nWARNING: using -h 0 may be faster\n");
-
-		if (nr_free*l > 2*active_size*(l-active_size))
-		{
-			for(i=active_size;i<l;i++)
-			{
-				float[] Q_i = Q.get_Q(i,active_size);
-				for(j=0;j<active_size;j++)
-					if(is_free(j))
-						G[i] += alpha[j] * Q_i[j];
-			}
-		}
-		else
-		{
-			for(i=0;i<active_size;i++)
-				if(is_free(i))
-				{
-					float[] Q_i = Q.get_Q(i,l);
-					double alpha_i = alpha[i];
-					for(j=active_size;j<l;j++)
-						G[j] += alpha_i * Q_i[j];
-				}
-		}
-	}
+	
 
 	void Solve(int l, QMatrix Q, double[] p_, byte[] y_,
 		   double[] alpha_, double Cp, double Cn, double eps, SolutionInfo si, int shrinking)
@@ -380,49 +262,27 @@ class Solver {
 				G[i] = p[i];
 				G_bar[i] = 0;
 			}
-			for(i=0;i<l;i++)
-				if(!is_lower_bound(i))
-				{
-					float[] Q_i = Q.get_Q(i,l);
-					double alpha_i = alpha[i];
-					int j;
-					for(j=0;j<l;j++)
-						G[j] += alpha_i*Q_i[j];
-					if(is_upper_bound(i))
-						for(j=0;j<l;j++)
-							G_bar[j] += get_C(i) * Q_i[j];
-				}
 		}
 
 		// optimization step
 
 		int iter = 0;
 		int max_iter = Math.max(10000000, l>Integer.MAX_VALUE/100 ? Integer.MAX_VALUE : 100*l);
-		int counter = Math.min(l,1000)+1;
 		int[] working_set = new int[2];
 
 		while(iter < max_iter)
 		{
 			// show progress and do shrinking
 
-			if(--counter == 0)
-			{
-				counter = Math.min(l,1000);
-				if(shrinking!=0) do_shrinking();
-				svm.info(".");
-			}
+			
 
 			if(select_working_set(working_set)!=0)
 			{
-				// reconstruct the whole gradient
-				reconstruct_gradient();
 				// reset active set size and check
 				active_size = l;
 				svm.info("*");
 				if(select_working_set(working_set)!=0)
 					break;
-				else
-					counter = 1;	// do shrinking next iteration
 			}
 
 			int i = working_set[0];
@@ -444,8 +304,6 @@ class Solver {
 			if(y[i]!=y[j])
 			{
 				double quad_coef = QD[i]+QD[j]+2*Q_i[j];
-				if (quad_coef <= 0)
-					quad_coef = 1e-12;
 				double delta = (-G[i]-G[j])/quad_coef;
 				double diff = alpha[i] - alpha[j];
 				alpha[i] += delta;
@@ -487,8 +345,6 @@ class Solver {
 			else
 			{
 				double quad_coef = QD[i]+QD[j]-2*Q_i[j];
-				if (quad_coef <= 0)
-					quad_coef = 1e-12;
 				double delta = (G[i]-G[j])/quad_coef;
 				double sum = alpha[i] + alpha[j];
 				alpha[i] -= delta;
@@ -571,17 +427,6 @@ class Solver {
 
 		}
 
-		if(iter >= max_iter)
-		{
-			if(active_size < l)
-			{
-				// reconstruct the whole gradient to calculate objective value
-				reconstruct_gradient();
-				active_size = l;
-				svm.info("*");
-			}
-			System.err.print("\nWARNING: reaching max number of iterations\n");
-		}
 
 		// calculate rho
 
@@ -646,8 +491,7 @@ class Solver {
 
 		int i = Gmax_idx;
 		float[] Q_i = null;
-		if(i != -1) // null Q_i not accessed: Gmax=-INF if i=-1
-			Q_i = Q.get_Q(i,active_size);
+		Q_i = Q.get_Q(i,active_size);
 
 		for(int j=0;j<active_size;j++)
 		{
@@ -662,10 +506,7 @@ class Solver {
 					{
 						double obj_diff;
 						double quad_coef = QD[i]+QD[j]-2.0*y[i]*Q_i[j];
-						if (quad_coef > 0)
-							obj_diff = -(grad_diff*grad_diff)/quad_coef;
-						else
-							obj_diff = -(grad_diff*grad_diff)/1e-12;
+						obj_diff = -(grad_diff*grad_diff)/quad_coef;
 
 						if (obj_diff <= obj_diff_min)
 						{
@@ -686,10 +527,7 @@ class Solver {
 					{
 						double obj_diff;
 						double quad_coef = QD[i]+QD[j]+2.0*y[i]*Q_i[j];
-						if (quad_coef > 0)
-							obj_diff = -(grad_diff*grad_diff)/quad_coef;
-						else
-							obj_diff = -(grad_diff*grad_diff)/1e-12;
+						obj_diff = -(grad_diff*grad_diff)/quad_coef;
 
 						if (obj_diff <= obj_diff_min)
 						{
@@ -709,90 +547,12 @@ class Solver {
 		return 0;
 	}
 
-	private boolean be_shrunk(int i, double Gmax1, double Gmax2)
-	{
-		if(is_upper_bound(i))
-		{
-			if(y[i]==+1)
-				return(-G[i] > Gmax1);
-			else
-				return(-G[i] > Gmax2);
-		}
-		else if(is_lower_bound(i))
-		{
-			if(y[i]==+1)
-				return(G[i] > Gmax2);
-			else
-				return(G[i] > Gmax1);
-		}
-		else
-			return(false);
-	}
+	
 
-	void do_shrinking()
-	{
-		int i;
-		double Gmax1 = -INF;		// max { -y_i * grad(f)_i | i in I_up(\alpha) }
-		double Gmax2 = -INF;		// max { y_i * grad(f)_i | i in I_low(\alpha) }
-
-		// find maximal violating pair first
-		for(i=0;i<active_size;i++)
-		{
-			if(y[i]==+1)
-			{
-				if(!is_upper_bound(i))
-				{
-					if(-G[i] >= Gmax1)
-						Gmax1 = -G[i];
-				}
-				if(!is_lower_bound(i))
-				{
-					if(G[i] >= Gmax2)
-						Gmax2 = G[i];
-				}
-			}
-			else
-			{
-				if(!is_upper_bound(i))
-				{
-					if(-G[i] >= Gmax2)
-						Gmax2 = -G[i];
-				}
-				if(!is_lower_bound(i))
-				{
-					if(G[i] >= Gmax1)
-						Gmax1 = G[i];
-				}
-			}
-		}
-
-		if(unshrink == false && Gmax1 + Gmax2 <= eps*10)
-		{
-			unshrink = true;
-			reconstruct_gradient();
-			active_size = l;
-			svm.info("*");
-		}
-
-		for(i=0;i<active_size;i++)
-			if (be_shrunk(i, Gmax1, Gmax2))
-			{
-				active_size--;
-				while (active_size > i)
-				{
-					if (!be_shrunk(active_size, Gmax1, Gmax2))
-					{
-						swap_index(i,active_size);
-						break;
-					}
-					active_size--;
-				}
-			}
-	}
+	
 
 	double calculate_rho()
 	{
-		double r;
 		int nr_free = 0;
 		double ub = INF, lb = -INF, sum_free = 0;
 		for(int i=0;i<active_size;i++)
@@ -820,12 +580,8 @@ class Solver {
 			}
 		}
 
-		if(nr_free>0)
-			r = sum_free/nr_free;
-		else
-			r = (ub+lb)/2;
+		return sum_free/nr_free;
 
-		return r;
 	}
 
 }
@@ -868,10 +624,6 @@ class SVC_Q extends Kernel
 
 	void swap_index(int i, int j)
 	{
-		cache.swap_index(i,j);
-		super.swap_index(i,j);
-		do {byte tmp=y[i]; y[i]=y[j]; y[j]=tmp;} while(false);
-		do {double tmp=QD[i]; QD[i]=QD[j]; QD[j]=tmp;} while(false);
 	}
 }
 
@@ -881,16 +633,9 @@ public class svm {
 	//
 	public static final Random rand = new Random();
 
-	private static svm_print_interface svm_print_stdout = new svm_print_interface()
-	{
-		public void print(String s)
-		{
-			System.out.print(s);
-			System.out.flush();
-		}
-	};
+	
 
-	private static svm_print_interface svm_print_string = svm_print_stdout;
+	//private static svm_print_interface svm_print_string = svm_print_stdout;
 
 	static void info(String s)
 	{
@@ -922,8 +667,7 @@ public class svm {
 		for(i=0;i<l;i++)
 			sum_alpha += alpha[i];
 
-		if (Cp==Cn)
-			svm.info("nu = "+sum_alpha/(Cp*prob.count)+"\n");
+		svm.info("nu = "+sum_alpha/(Cp*prob.count)+"\n");
 
 		for(i=0;i<l;i++)
 			alpha[i] *= y[i];
@@ -944,13 +688,8 @@ public class svm {
 	{
 		double[] alpha = new double[prob.count];
 		Solver.SolutionInfo si = new Solver.SolutionInfo();
-		switch(param.svm_type)
-		{
-			case svm_parameter.C_SVC:
-				solve_c_svc(prob,param,alpha,si,Cp,Cn);
-				break;
-			
-		}
+		solve_c_svc(prob,param,alpha,si,Cp,Cn);
+		
 
 		svm.info("obj = "+si.obj+", rho = "+si.rho+"\n");
 
@@ -1012,39 +751,12 @@ public class svm {
 			data_label[i] = j;
 			if(j == nr_class)
 			{
-				if(nr_class == max_nr_class)
-				{
-					max_nr_class *= 2;
-					int[] new_data = new int[max_nr_class];
-					System.arraycopy(label,0,new_data,0,label.length);
-					label = new_data;
-					new_data = new int[max_nr_class];
-					System.arraycopy(count,0,new_data,0,count.length);
-					count = new_data;
-				}
 				label[nr_class] = this_label;
 				count[nr_class] = 1;
 				++nr_class;
 			}
 		}
 
-		//
-		// Labels are ordered by their first occurrence in the training set.
-		// However, for two-class sets with -1/+1 labels and -1 appears first,
-		// we swap labels to ensure that internally the binary SVM has positive data corresponding to the +1 instances.
-		//
-		if (nr_class == 2 && label[0] == -1 && label[1] == +1)
-		{
-			do {int tmp=label[0]; label[0]=label[1]; label[1]=tmp;} while(false);
-			do {int tmp=count[0]; count[0]=count[1]; count[1]=tmp;} while(false);
-			for(i=0;i<l;i++)
-			{
-				if(data_label[i] == 0)
-					data_label[i] = 1;
-				else
-					data_label[i] = 0;
-			}
-		}
 
 		int[] start = new int[nr_class];
 		start[0] = 0;
@@ -1089,8 +801,6 @@ public class svm {
 		int[] start = tmp_start[0];
 		int[] count = tmp_count[0];
 
-		if(nr_class == 1)
-			svm.info("WARNING: training data in only one class. See README for details.\n");
 
 		svm_node[][] x = new svm_node[l][];
 		int i;
@@ -1102,18 +812,6 @@ public class svm {
 		double[] weighted_C = new double[nr_class];
 		for(i=0;i<nr_class;i++)
 			weighted_C[i] = param.C;
-		for(i=0;i<param.nr_weight;i++)
-		{
-			int j;
-			for(j=0;j<nr_class;j++)
-				if(param.weight_label[i] == label[j])
-					break;
-			if(j == nr_class)
-				System.err.print("WARNING: class label "+param.weight_label[i]+" specified in weight is not found\n");
-			else
-				weighted_C[j] *= param.weight[i];
-		}
-
 		// train k*(k-1)/2 models
 
 		boolean[] nonzero = new boolean[l];
@@ -1121,12 +819,6 @@ public class svm {
 			nonzero[i] = false;
 		decision_function[] f = new decision_function[nr_class*(nr_class-1)/2];
 
-		double[] probA=null,probB=null;
-		if (param.probability == 1)
-		{
-			probA=new double[nr_class*(nr_class-1)/2];
-			probB=new double[nr_class*(nr_class-1)/2];
-		}
 
 		int p = 0;
 		for(i=0;i<nr_class;i++)
@@ -1150,13 +842,6 @@ public class svm {
 					sub_prob.labels[ci+k] = -1;
 				}
 
-				if(param.probability == 1)
-				{
-					double[] probAB=new double[2];
-					//svm_binary_svc_probability(sub_prob,param,weighted_C[i],weighted_C[j],probAB);
-					probA[p]=probAB[0];
-					probB[p]=probAB[1];
-				}
 
 				f[p] = svm_train_one(sub_prob,param,weighted_C[i],weighted_C[j]);
 				for(k=0;k<ci;k++)
@@ -1180,21 +865,8 @@ public class svm {
 		for(i=0;i<nr_class*(nr_class-1)/2;i++)
 			model.rho[i] = f[i].rho;
 
-		if(param.probability == 1)
-		{
-			model.probA = new double[nr_class*(nr_class-1)/2];
-			model.probB = new double[nr_class*(nr_class-1)/2];
-			for(i=0;i<nr_class*(nr_class-1)/2;i++)
-			{
-				model.probA[i] = probA[i];
-				model.probB[i] = probB[i];
-			}
-		}
-		else
-		{
-			model.probA=null;
-			model.probB=null;
-		}
+		model.probA=null;
+		model.probB=null;
 		model.prob_density_marks = null;	// for one-class SVM probabilistic outputs only
 
 		int total_sv = 0;
@@ -1325,5 +997,4 @@ public class svm {
 		dec_values = new double[nr_class*(nr_class-1)/2];
 		return svm_predict_values(model, x, dec_values);
 	}
-
 }

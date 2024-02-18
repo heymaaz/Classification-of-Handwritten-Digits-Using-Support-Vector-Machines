@@ -3,8 +3,8 @@ import java.io.FileNotFoundException;
 import java.util.Scanner;
 
 class Main {
-    private static final String PATH_TO_CSV_DATASET1 = "cw2DataSet1.csv";
-    private static final String PATH_TO_CSV_DATASET2 = "cw2DataSet2.csv";
+    private static final String PATH_TO_CSV_DATASET1 = "src/cw2DataSet1.csv";
+    private static final String PATH_TO_CSV_DATASET2 = "src/cw2DataSet2.csv";
     private static final int PIXELS_IN_ROW = 8;//8 pixels in a row
     private static final int PIXEL_COUNT = PIXELS_IN_ROW*PIXELS_IN_ROW;//8x8 pixels in the image = 64 pixels
     private static final int ROW_LENGTH = PIXEL_COUNT+1;//64 pixels + 1 label in the csv file for each row = 65 columns
