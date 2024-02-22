@@ -3,13 +3,23 @@ import java.io.FileNotFoundException;
 import java.util.Scanner;
 
 class Main {
+	// This class implements a Support Vector Machine (SVM) model to classify images of handwritten digits
+	// Only this class is written by me. The rest of the code has been taken from the libsvm library
+	// The libsvm library is used to implement the SVM using the SMO Algorithm and is available at https://www.csie.ntu.edu.tw/~cjlin/libsvm/
+	// The source code for the libsvm library is available at https://github.com/cjlin1/libsvm
+	// This class reads the training and test data from csv files and trains and tests the SVM model on the data
+	// Before sending the data to the SVM model, the pixel values are normalized to 0-1 by dividing by 16
+	// The accuracy of the model is calculated as the percentage of correct predictions by the model
+	// The confusion matrix and the misclassified rate for each digit are printed
+
     private static final String PATH_TO_CSV_DATASET1 = "cw2DataSet1.csv";
     private static final String PATH_TO_CSV_DATASET2 = "cw2DataSet2.csv";
     private static final int PIXELS_IN_ROW = 8;//8 pixels in a row
     private static final int PIXEL_COUNT = PIXELS_IN_ROW*PIXELS_IN_ROW;//8x8 pixels in the image = 64 pixels
     private static final int ROW_LENGTH = PIXEL_COUNT+1;//64 pixels + 1 label in the csv file for each row = 65 columns
-    private static final int FILE_NOT_FOUND_CODE = -1;//Error code for file not found
-    private static final int ERROR_READING_FILE_CODE = -2;//Error code for error reading file
+	private static final int NUMBER_OF_CLASSES = 10;//Number of classes in the dataset
+    private static final double ROUNDING_4_PLACES = 10000.0;//This is used to round the number to 4 decimal places
+    private static final double CENTURY_FOR_PERCENTAGE = 100.0;//This is used to calculate the percentage
 	private static final double PIXEL_VALUE = 16.0;//16 different pixel values in the image
 	private static final double TWO_FOR_AVG = 2.0;//Divisor for calculating the average accuracy
 
@@ -22,7 +32,9 @@ class Main {
 		// It runs the SVM model on both datasets and prints the average accuracy
 
 		// Run the SVM model on both datasets
+		System.out.println("Fold 1:");
 		double accuracy1 = runSVM(PATH_TO_CSV_DATASET1, PATH_TO_CSV_DATASET2);
+		System.out.println("Fold 2:");
 		double accuracy2 = runSVM(PATH_TO_CSV_DATASET2, PATH_TO_CSV_DATASET1);
 
 		// Print the accuracy of the model on both datasets
@@ -127,7 +139,7 @@ class Main {
 		// Read the test data from the csv file
 		int[][] testData = readCSV(testFile);
 
-		return (double)countCorrectCategorisation(model,testData)/testData.length*100;//Return the accuracy of the model
+		return get4Point(countCorrectCategorisation(model,testData), testData.length);//Return the accuracy of the model rounded to 4 decimal places
 	}
 
 	static int countCorrectCategorisation(svm_model model, int[][] testData){
@@ -154,35 +166,62 @@ class Main {
 			
 		}
 		printConfusionMatrix(confusionMatrix);//Print the confusion matrix
+		printMisclassified(confusionMatrix);//Print the misclassified rate for each digit
 		return correct;
 	}
 
-	static void printConfusionMatrix(int[][] confusionMatrix) {
+    static void printConfusionMatrix(int[][] confusionMatrix) {
 		// This function prints the confusion matrix
+        // The confusion matrix is a 2D array where the rows represent the actual labels and the columns represent the predicted labels
+        // The value at the intersection of the row and column is the number of images with the actual label and the predicted label
+
 		System.out.println("Confusion Matrix:");
 		System.out.print("Label\t");
-		for(int i = 0; i < 10; i++) {
-			System.out.print(i + "\t");
+		for(int predictedLabel = 0; predictedLabel < NUMBER_OF_CLASSES; predictedLabel++) {
+			System.out.print(predictedLabel + "\t");//Print the predicted labels at the top
 		}
-		System.out.println();
-		for(int i = 0; i < 10; i++) {
-			System.out.print(i + "\t");
-			for(int j = 0; j < 10; j++) {
-				System.out.print(confusionMatrix[i][j] + "\t");
+		System.out.println();//Move to the next line
+
+		for(int label = 0; label < NUMBER_OF_CLASSES; label++) {//For each label
+			System.out.print(label + "\t");//Print the actual label on the left
+			for(int predictedLabel = 0; predictedLabel < NUMBER_OF_CLASSES; predictedLabel++) {//For each predicted label
+				System.out.print(confusionMatrix[label][predictedLabel] + "\t");//Print the number of images with the actual label and the predicted label
 			}
-			System.out.println();
+			System.out.println();//Move to the next line
 		}
+    }
+
+    static void printMisclassified(int[][] confusionMatrix) {
+        // This function prints the misclassified rate for each digit
+        // The misclassified rate is the number of misclassified images for each digit as a percentage of the total number of images for that digit
+        
+        System.out.println("Digit\tMisclassified\tRate");//Print the header for the misclassified rate
+        for (int rowIterator = 0; rowIterator < confusionMatrix.length; rowIterator++) {
+            int misclassified = 0;//Initialise the number of misclassified images for each digit to 0
+            for (int colIterator = 0; colIterator < confusionMatrix[rowIterator].length; colIterator++) {
+                if (rowIterator != colIterator) {//if the actual label is not equal to the predicted label
+                    misclassified += confusionMatrix[rowIterator][colIterator];//Increment the number of misclassified images for each digit 
+                }
+            }
+            //Print the misclassified rate for each digit
+            System.out.println(rowIterator + "\t" + misclassified+ "\t\t" + get4Point(misclassified,(confusionMatrix[rowIterator][rowIterator]+misclassified))+"%");
+        }
 	}
-	
-	static int[][] readCSV(String filename) {
+
+    static double get4Point(double numerator, double denominator){
+        // This function returns the value of a number rounded to 4 decimal places as a percentage
+        // The value is calculated as (numerator/denominator)*100 and rounded to 4 decimal places
+
+        return Math.round(numerator*ROUNDING_4_PLACES*CENTURY_FOR_PERCENTAGE/denominator)/ROUNDING_4_PLACES;
+    }
+
+    static int[][] readCSV(String filename) {
         // This function reads a csv file and returns a 2D array of integers containing the data from the csv file
-        // If there is an error reading the file it prints the stack trace and returns null
+        // If there is an error reading the file it prints the stack trace and exits the program
+
         try{
             File myFile = new File(filename);//creates a new file instance
             int lineCount = countLines(myFile);
-            if(lineCount == FILE_NOT_FOUND_CODE || lineCount == ERROR_READING_FILE_CODE){
-                return null;
-            }
             int[][] myArray = new int[lineCount][ROW_LENGTH];//Create an array to store the data from the csv file. Each row has 65 columns(64 pixels + 1 label)
             Scanner readMyFile = new Scanner(myFile);//creates a new scanner instance
             for (int image = 0; image < lineCount; image++) {
@@ -194,16 +233,17 @@ class Main {
             readMyFile.close();
             return myArray;
         } catch (FileNotFoundException invalidPathToFile) {
-            System.out.println("File not found");
+            System.out.println("File not found at path: "+filename);
             invalidPathToFile.printStackTrace();
-            return null;
+            System.exit(0);
         }
+        return null;//just to satisfy the compiler
     }
 
     static int countLines(File myFile) {
         // This function counts the number of lines in a file
-        // It returns FILE_NOT_FOUND_CODE if the file is not found
-        // It returns ERROR_READING_FILE_CODE if there is an error reading the file
+        // If there is an error reading the file it prints the stack trace and exits the program
+
         try{
             Scanner readMyFile = new Scanner(myFile);
             int lineCount = 0;
@@ -214,9 +254,10 @@ class Main {
             readMyFile.close();
             return lineCount;
         } catch (FileNotFoundException invalidPathToFile) {
-            System.out.println("File not found");
-            return FILE_NOT_FOUND_CODE;
+            System.out.println("File not found at path: "+myFile.getPath());
+            invalidPathToFile.printStackTrace();
+            System.exit(0);
         }
+        return 0;//just to satisfy the compiler
     }
-
 }

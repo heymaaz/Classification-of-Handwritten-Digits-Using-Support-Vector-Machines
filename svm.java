@@ -1,3 +1,6 @@
+	// The source code for the libsvm library is available at https://github.com/cjlin1/libsvm	
+	// The documentation for the libsvm library is available at https://www.csie.ntu.edu.tw/~cjlin/libsvm/
+
 import java.util.Random;
 
 //
@@ -648,7 +651,7 @@ public class svm {
 
 	static void info(String s)
 	{
-		svm_print_string.print(s);
+		//svm_print_string.print(s);//uncomment to see the calculation of the SVM
 	}
 
 	private static void solve_c_svc(svm_problem prob, svm_parameter param,
